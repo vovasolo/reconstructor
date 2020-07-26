@@ -58,6 +58,10 @@ int main()
     std::vector <std::vector <double> > Data;
 
     std::ifstream f("Simulation_10k.txt");
+    if (!f.good()) {
+        std::cout << "Unpack data/Simulation_10k.txt.zip into work directory first" << std::endl;
+        return 1;
+    }
     std::string line;
     while (std::getline(f, line)) {
         std::vector <double> evt;
