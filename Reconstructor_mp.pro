@@ -5,6 +5,9 @@ CONFIG -= qt
 CONFIG += c++11
 QMAKE_CXXFLAGS += -march=native -O2
 
+QMAKE_CXXFLAGS += -fopenmp
+QMAKE_LFLAGS += -fopenmp
+
 INCLUDEPATH += lib
 INCLUDEPATH += spline123
 INCLUDEPATH += LRModel
@@ -24,7 +27,7 @@ SOURCES += \
     spline123/bspline123d.cpp \
     lib/json11.cpp \
     reconstructor.cpp \
-    example1.cpp
+    example1_mp.cpp
 
 HEADERS += \
     LRModel/lrfaxial.h \

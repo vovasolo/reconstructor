@@ -11,6 +11,7 @@
 #include "bsfit123.h"
 #include "reconstructor.h"
 #include <cmath>
+#include "omp.h"
 
 int main()
 {
@@ -137,6 +138,49 @@ int main()
     datafile.open ("LRM_square8x8.json", std::ios_base::app);
     datafile << lrm.GetJsonString();
     datafile.close();
+
+// 8. OpenMP multithreading
+    const int Nthr = 3; // number of threads
+    std::vector <int> status;
+    std::vector <std::array <double, 4> > Result;
+    status.resize(Data.size());
+    Result.resize(Data.size());
+    Reconstructor* recomp[Nthr];
+    int jmin[Nthr], jmax[Nthr];
+    int chunk = Data.size()/Nthr;
+    for (int i=0; i<Nthr; i++) {
+        jmin[i] = i*chunk;
+        jmax[i] = (i+1)*chunk;
+        std::cout << jmin[i] << ", " << jmax[i] << std::endl;
+    }
+    jmax[Nthr-1] = Data.size();
+
+    #pragma omp parallel for
+    for (int i=0; i<Nthr; i++) {
+        recomp[i] = new Reconstructor(&lrm);
+        recomp[i]->InitMinimizer();
+        recomp[i]->setCogRelCutoff(0.1);
+        recomp[i]->setEnergyCalibration(0.005);
+
+        for (int j=jmin[i]; j<jmax[i]; j++) {
+            recomp[i]->ProcessEvent(Data[j], sat);
+            status[j] = recomp[i]->getRecStatus();
+            Result[j][0] = Data[j][65];
+            Result[j][1] = recomp[i]->getRecX();
+            Result[j][2] = Data[j][66];
+            Result[j][3] = recomp[i]->getRecY();
+        }
+    }
+
+    std::ofstream recfile_mp;
+    recfile_mp.open ("reconstruction_mp.txt", std::ios_base::app);
+    for (int i=0; i<Result.size(); i++) {
+        auto r = Result[i];
+        if (status[i])
+            continue;
+        recfile_mp << r[0] << " " << r[1] << " " << r[2] << " " << r[3] << std::endl;
+    }
+    recfile_mp.close();
 
     return 0;
 }
