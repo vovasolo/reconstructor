@@ -56,6 +56,9 @@ private:
 
     Matrix2d A; // forward matrix
     Matrix2d B; // inverse matrix
+
+public:
+    EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 };
 
 // NB: for reflections, forward and inverse transforms are the same
@@ -75,6 +78,8 @@ private:
     double phi;
 
     Matrix2d A; // forward and inverse matrix
+public:
+    EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 };
 
 #endif // TRANSFORM_H
