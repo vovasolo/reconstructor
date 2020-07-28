@@ -9,16 +9,18 @@ Compress1d* Compress1d::Factory(const Json &json)
             return comp;
         else {
             delete comp;
-            return NULL;
+            return nullptr;
         }
     }
     else
-        return NULL;
+        return nullptr;
 }
 
 void DualSlopeCompress::Init()
 {
-    if (r0 < 0. || k <= 1.)
+    fValid = false;
+
+    if (r0 < 0 || k <= 1.0)
         return;
 
     a = (k+1)/(k-1);
@@ -28,12 +30,9 @@ void DualSlopeCompress::Init()
     fValid = true;
 }
 
-DualSlopeCompress::DualSlopeCompress(double k, double r0, double lam)
+DualSlopeCompress::DualSlopeCompress(double k, double r0, double lam) :
+    k(k), r0(r0), lam(lam)
 {
-    this->r0 = r0;
-    this->k = k;
-    this->lam = lam;
-
     Init();
 }
 
@@ -58,7 +57,7 @@ double DualSlopeCompress::Rho(double r) const
 double DualSlopeCompress::RhoDrv(double r) const
 {
     double dr = r - r0;
-    return dr/sqrt(dr*dr + lam2) + a;
+    return dr/sqrt(dr*dr + lam2) + a;  // !*! Andr: what if r = r0 and lam2 = 0 ?
 }
 
 void  DualSlopeCompress::ToJsonObject(Json_object &json) const

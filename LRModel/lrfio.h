@@ -6,6 +6,8 @@
 #define BSIO
 
 #include <map>
+#include <string>
+
 namespace json11 {
     class Json;
 }
@@ -15,12 +17,13 @@ typedef std::map<std::string, Json> Json_object;
 class LRF_IO
 {
 public:
-    LRF_IO();
-    virtual ~LRF_IO() {};
+    //LRF_IO() {}
+    virtual ~LRF_IO() {}
 
-    virtual void ToJsonObject(Json_object &json) const = 0;
-    Json_object GetJsonObject() const;
-    std::string GetJsonString() const;
+    virtual void ToJsonObject(Json_object &json) const = 0;   // Andr: suggest To... -> to...
+
+    Json_object GetJsonObject() const; // get...
+    std::string GetJsonString() const; // get...
 };
 
 #endif // LRFIO_H

@@ -7,12 +7,14 @@
 class Compress1d : public LRF_IO
 {
 public:
-    Compress1d() {}
-    virtual ~Compress1d() {}
+    //Compress1d() {}
+    //virtual ~Compress1d() {} //Andr: already virtual in the base class
+
     virtual Compress1d* clone() const = 0;
     virtual double Rho(double r) const = 0;
     virtual double RhoDrv(double r) const = 0;
-    virtual void ToJsonObject(Json_object &json) const = 0;
+
+    void ToJsonObject(Json_object &json) const override = 0;
 
     static Compress1d* Factory(const Json &json);
 
@@ -27,16 +29,18 @@ class DualSlopeCompress : public Compress1d
 public:
     DualSlopeCompress(double k, double r0, double lam);
     DualSlopeCompress(const Json &json);
-    virtual DualSlopeCompress* clone() const { return new DualSlopeCompress(*this); }
+    DualSlopeCompress* clone() const override { return new DualSlopeCompress(*this); }
+    double Rho(double r) const override;
+    double RhoDrv(double r) const override;
+    void ToJsonObject(Json_object &json) const override;
+
+protected:
     void Init();
-    virtual double Rho(double r) const;
-    virtual double RhoDrv(double r) const;
-    virtual void ToJsonObject(Json_object &json) const;
 
 private:
     double k;
     double r0;
-    double lam;
+    double lam = 0;
 
     double a;
     double b;

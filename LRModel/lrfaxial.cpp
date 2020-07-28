@@ -5,10 +5,9 @@
 #include "json11.hpp"
 #include "profileHist.h"
 
-LRFaxial::LRFaxial(double rmax, int nint)
+LRFaxial::LRFaxial(double rmax, int nint) :
+    rmax(rmax), nint(nint)
 {
-    this->rmax = rmax;
-    this->nint = nint;
     bsr = new Bspline1d(rmin, rmax, nint);
     Init();
 }
@@ -16,9 +15,9 @@ LRFaxial::LRFaxial(double rmax, int nint)
 LRFaxial* LRFaxial::clone() const 
 { 
     LRFaxial *copy = new LRFaxial(*this);
-    copy->bsr = bsr ? new Bspline1d(*bsr) : nullptr;
-    copy->compress = compress ? compress->clone() : nullptr;
-    copy->bsfit = bsfit ? bsfit->clone() : nullptr;
+    copy->bsr = ( bsr ? new Bspline1d(*bsr) : nullptr );
+    copy->compress = ( compress ? compress->clone() : nullptr );
+    copy->bsfit = ( bsfit ? bsfit->clone() : nullptr );
     return copy;
 }
 
@@ -46,6 +45,8 @@ void LRFaxial::SetRmin(double val)
     rmin2 = rmin*rmin;
     delete bsr;
     bsr = new Bspline1d(Rho(rmin), Rho(rmax), nint);
+
+    Init(); // Andr: to update xmin xmax etc
 }
 
 void LRFaxial::SetRmax(double val)
@@ -54,6 +55,8 @@ void LRFaxial::SetRmax(double val)
     rmax2 = rmax*rmax;
     delete bsr;
     bsr = new Bspline1d(Rho(rmin), Rho(rmax), nint);
+
+    Init(); // Andr: to update xmin xmax etc
 }
 
 void LRFaxial::SetCompression(Compress1d *compress)
@@ -67,10 +70,11 @@ LRFaxial::LRFaxial(const Json &json)
 {
     if (!json["rmax"].is_number())
         return;
+
 // if x0, y0 or rmin key is not present in JSON object it defaults to 0
 // providing compatibility with previous version
-    x0 = json["x0"].number_value();
-    y0 = json["y0"].number_value();
+    x0   = json["x0"].number_value();
+    y0   = json["y0"].number_value();
     rmin = json["rmin"].number_value();
     rmax = json["rmax"].number_value();
     if (rmax <= rmin)
@@ -90,7 +94,8 @@ LRFaxial::LRFaxial(const Json &json)
     valid = true;
 }
 
-LRFaxial::LRFaxial(std::string &json_str) : LRFaxial(Json::parse(json_str, json_err)) {}
+LRFaxial::LRFaxial(std::string &json_str) :
+    LRFaxial(Json::parse(json_str, json_err)) {}
 
 LRFaxial::~LRFaxial()
 {
@@ -100,7 +105,7 @@ LRFaxial::~LRFaxial()
 
 bool LRFaxial::isReady() const
 {
-    return (bsr != 0) && bsr->IsReady();
+    return bsr && bsr->IsReady();
 }
 
 bool LRFaxial::inDomain(double x, double y, double /*z*/) const
@@ -111,39 +116,46 @@ bool LRFaxial::inDomain(double x, double y, double /*z*/) const
 
 double LRFaxial::Rho(double r) const
 {
-    return compress ? compress->Rho(r) : r;
+    return ( compress ? compress->Rho(r)
+                      : r );
 }
 
 double LRFaxial::Rho(double x, double y) const
 {
-    return compress ? compress->Rho(R(x, y)) : R(x, y);
+    return ( compress ? compress->Rho(R(x, y))
+                      : R(x, y) );
 }
 
 double LRFaxial::RhoDrvX(double x, double y) const
 {
     double drdx = (x-x0)/R(x, y);
-    return compress ? compress->RhoDrv(R(x, y))*drdx : drdx;
+    return ( compress ? compress->RhoDrv(R(x, y))*drdx
+                      : drdx );
 }
 
 double LRFaxial::RhoDrvY(double x, double y) const
 {
     double drdy = (y-y0)/R(x, y);
-    return compress ? compress->RhoDrv(R(x, y))*drdy : drdy;
+    return ( compress ? compress->RhoDrv(R(x, y))*drdy
+                      : drdy );
 }
 
 double LRFaxial::eval(double x, double y, double /*z*/) const
 {
-    return isReady() ? bsr->Eval(Rho(x, y)) : 0.;
+    return ( isReady() ? bsr->Eval(Rho(x, y))
+                       : 0 );
 }
 
 double LRFaxial::evalDrvX(double x, double y, double /*z*/) const
 {
-    return isReady() ? bsr->EvalDrv(Rho(x, y))*RhoDrvX(x, y) : 0.;
+    return ( isReady() ? bsr->EvalDrv(Rho(x, y))*RhoDrvX(x, y)
+                       : 0 );
 }
 
 double LRFaxial::evalDrvY(double x, double y, double /*z*/) const
 {
-    return isReady() ? bsr->EvalDrv(Rho(x, y))*RhoDrvY(x, y) : 0.;
+    return ( isReady() ? bsr->EvalDrv(Rho(x, y))*RhoDrvY(x, y)
+                       : 0 );
 }
 
 BSfit1D *LRFaxial::InitFit()
@@ -154,7 +166,7 @@ BSfit1D *LRFaxial::InitFit()
     ConstrainedFit1D *cf = new ConstrainedFit1D(bsr);
     if (non_increasing) cf->ForceNonIncreasing();
     if (non_negative) cf->ForceNonNegative();
-    if (flattop) cf->FixDrvLeft(0.);
+    if (flattop) cf->FixDrvLeft(0);
     return cf;
 }
 
@@ -229,8 +241,8 @@ double LRFaxial::GetRatio(LRF* other_base) const
     if (h1->GetBinsTotal() != nbins)
         return -1;
 
-    double sumxy = 0.;
-    double sumxx = 0.;
+    double sumxy = 0;
+    double sumxx = 0;
 
     for (int i=0; i<nbins; i++) {
         if (h0->GetFlatBinEntries(i) && h1->GetFlatBinEntries(i))  { // must have something in both bins
@@ -240,7 +252,8 @@ double LRFaxial::GetRatio(LRF* other_base) const
         }
     }
 
-    return sumxx > 0. ? sumxy/sumxx : -1;
+    return ( sumxx > 0. ? sumxy/sumxx
+                        : -1 );
 }
 
 /* double LRFaxial::fitRData(int npts, const double *r, const double *data)
@@ -265,7 +278,7 @@ double LRFaxial::GetRatio(LRF* other_base) const
     return F.GetResidual();
 } */
 
-// TODO: make it safer (convert into reference?)
+// TODO: make it safer (convert into reference?)  !*! Andr: agree!
 const Bspline1d *LRFaxial::getSpline() const
 {
     return bsr;

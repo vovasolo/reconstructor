@@ -17,7 +17,3 @@ std::string LRF_IO::GetJsonString() const
 }
 #endif
 
-LRF_IO::LRF_IO()
-{
-
-}
