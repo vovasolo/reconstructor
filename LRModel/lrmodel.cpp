@@ -20,6 +20,31 @@ double LRSensor::GetPhi() const
     return phi;
 }
 
+double LRSensor::GetDistance(double x1, double y1) const
+{
+    return sqrt((x1-x)*(x1-x) + (y1-y)*(y1-y));
+}
+
+bool LRSensor::operator<(const LRSensor &s) const
+{
+    return (GetRadius() < s.GetRadius());
+}
+
+bool LRSensor::Compare_R(const LRSensor &a, const LRSensor &b)
+{
+    return (a.GetRadius() < b.GetRadius());
+}
+
+bool LRSensor::Compare_Phi(const LRSensor &a, const LRSensor &b)
+{
+    return (a.GetPhi() < b.GetPhi());
+}
+
+double LRSensor::Distance(const LRSensor &a, const LRSensor &b)
+{
+    return sqrt((a.x-b.x)*(a.x-b.x) + (a.y-b.y)*(a.y-b.y));
+}
+
 LRModel::LRModel(int n)
 {
     Sensor.resize(n);
@@ -73,14 +98,19 @@ void LRModel::AddSensor(int id, double x, double y)
 
 std::vector <double> LRModel::GetAllX() const
 {
-    std::vector <double> tmp(GetSensorCount());
+    //std::vector <double> tmp(GetSensorCount());
+    std::vector <double> tmp;
+    tmp.reserve(GetSensorCount());
     for (LRSensor s : Sensor)
         tmp.push_back(s.x);
     return tmp;
 }
+
 std::vector <double> LRModel::GetAllY() const
 {
-    std::vector <double> tmp(GetSensorCount());
+    //std::vector <double> tmp(GetSensorCount());
+    std::vector <double> tmp;
+    tmp.reserve(GetSensorCount());
     for (LRSensor s : Sensor)
         tmp.push_back(s.y);
     return tmp;
@@ -98,9 +128,9 @@ int LRModel::CreateGroup()
 
 bool LRModel::DissolveGroup(int gid)
 {
-    std::set <int> members = GroupMembers(gid);
-    for (int i : members)
-        RemoveFromGroup(i);
+    std::set <int> members = GroupMembers(gid); // !*! Andr: it is an example where GroupMembers() can be avoided by adding a specialized method
+    for (int i : members)                       //
+        RemoveFromGroup(i);                     //
 
     delete Group.at(gid).glrf;
     Group.erase(Group.begin()+gid);
@@ -134,7 +164,7 @@ bool LRModel::RemoveFromGroup(int id, UngroupPolicy policy)
             break;
         case ResetLRF:
             Sensor.at(id).lrf = DefaultLRF->clone();
-            SetTransform(id, 0);
+            SetTransform(id, nullptr);
             SetGain(id, 1.0);
             break;
     }
@@ -163,7 +193,8 @@ void LRModel::SetLRF(int id, LRF *lrfptr)
 LRF *LRModel::GetLRF(int id)
 {
     int gid = GetGroup(id);
-    return gid == -1 ? Sensor.at(id).lrf : Group.at(gid).glrf;
+    return ( gid == -1 ? Sensor.at(id).lrf
+                       : Group.at(gid).glrf );
 }
 
 void LRModel::SetGroupLRF(int gid, LRF *lrfptr)
@@ -203,7 +234,7 @@ double LRModel::EvalDrvX(int id, double *pos_world)
     double z = pos_world[2];
     if (GetTransform(id))
         GetTransform(id)->DoTransform(&x, &y, &z);
-    return GetLRF(id)->evalDrvX(x, y, z)*GetGain(id);
+    return GetLRF(id)->evalDrvX(x, y, z)*GetGain(id);   // Andr: really should be multiplied by gain?
 }
 
 double LRModel::EvalDrvY(int id, double *pos_world)
@@ -213,7 +244,7 @@ double LRModel::EvalDrvY(int id, double *pos_world)
     double z = pos_world[2];
     if (GetTransform(id))
         GetTransform(id)->DoTransform(&x, &y, &z);
-    return GetLRF(id)->evalDrvY(x, y, z)*GetGain(id);
+    return GetLRF(id)->evalDrvY(x, y, z)*GetGain(id);   // Andr: really should be multiplied by gain?
 }
 
 bool LRModel::FitNotBinnedData(int id, const std::vector <LRFdata> &data)
@@ -308,7 +339,7 @@ void LRModel::MakeRotGroup(std::vector <LRSensor> &ring)
     Group[gid].y = ring[0].y;
     AddToGroup(ring[0].id, gid, 0);
 
-    for (unsigned int i=1; i<ring.size(); i++)
+    for (unsigned int i=1; i<ring.size(); i++)    // Andr: unsigned int -> size_t
         AddToGroup(ring[i].id, gid, new RotateLRF(phi0 - ring[i].GetPhi()));
 }
 
@@ -324,7 +355,7 @@ void LRModel::MakeGroupsByTransform(std::vector <Transform*> vtr)
         double x0 = Group[gid].x = ls[0].x;
         double y0 = Group[gid].y = ls[0].y;
         for (Transform *tr : vtr) {
-            for (unsigned int i=1; i<ls.size(); i++) {
+            for (unsigned int i=1; i<ls.size(); i++) {     // Andr: unsigned int -> size_t
                 double x1 = ls[i].x;
                 double y1 = ls[i].y;
                 double z1 = 0.;
@@ -516,14 +547,13 @@ double LRModel::GetGroupMaxR(int gid, const std::vector <LRFdata> &data) const
 
 // Gain estimator
 
-GainEstimator::GainEstimator(LRModel *M, int gid)
+GainEstimator::GainEstimator(LRModel *M, int gid) :
+    M(M), gid(gid)
 {
-    this->M = M;
-    this->gid = gid;
     members = M->GroupMembers(gid);
 //    lrfs.reserve(members.size());
     for (int id : members) {
-        lrfs.push_back(M->GetGroupLRF(gid)->clone());
+        lrfs.push_back(M->GetGroupLRF(gid)->clone());   // Andr: Possible bug: "id" is not used
     }
 }
 
@@ -546,7 +576,8 @@ double GainEstimator::GetRelativeGain(int id, int refid)
 std::vector <double> GainEstimator::GetAllRelativeGains(int refid)
 {
     std::vector <double> gains;
-    for (unsigned int id = 0; id < members.size(); id++)
+    gains.reserve(members.size());
+    for (unsigned int id = 0; id < members.size(); id++)  // Andr: unsigned int -> size_t
         gains.push_back(GetRelativeGain(id, refid));
     return gains;
 }

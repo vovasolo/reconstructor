@@ -16,17 +16,12 @@ friend class LRModel;
 public:
     double GetRadius() const;
     double GetPhi() const;
-    double GetDistance(double x1, double y1) const
-        {return sqrt((x1-x)*(x1-x) + (y1-y)*(y1-y));}
-    bool operator < (const LRSensor& s) const {
-        return (GetRadius() < s.GetRadius());
-    }
-    static bool Compare_R(const LRSensor &a, const LRSensor &b)
-        { return (a.GetRadius() < b.GetRadius()); }
-    static bool Compare_Phi(const LRSensor &a, const LRSensor &b)
-        { return (a.GetPhi() < b.GetPhi()); }
-    static double Distance(const LRSensor &a, const LRSensor &b)
-        { return sqrt((a.x-b.x)*(a.x-b.x) + (a.y-b.y)*(a.y-b.y)); }
+    double GetDistance(double x1, double y1) const;
+    bool operator< (const LRSensor& s) const;
+
+    static bool Compare_R(const LRSensor &a, const LRSensor &b);
+    static bool Compare_Phi(const LRSensor &a, const LRSensor &b);
+    static double Distance(const LRSensor &a, const LRSensor &b);
 
 protected:
     int id = -1;        // must coincide with vector element
@@ -35,8 +30,8 @@ protected:
 //  double z = 0.;      // later
 //  double normal[3];   // later
     double gain = 1.0;  // relative gain
-    Transform *tr = 0;
-    LRF *lrf = 0;
+    Transform *tr = nullptr;
+    LRF *lrf = nullptr;
 };
 
 struct LRGroup
@@ -46,7 +41,7 @@ struct LRGroup
     double x, y;        // coordinates of the reference point
 //  double z = 0.;      // later
 //  double normal[3];   // later
-    LRF *glrf = 0;
+    LRF *glrf = nullptr;
 };
 
 class LRModel
@@ -59,6 +54,8 @@ class LRModel
 public:
     LRModel(int n);
     LRModel(int n, LRF *default_lrf);
+    LRModel(const Json &json);
+    LRModel(std::string &json_str);
     ~LRModel();
 
     void SetGain(int id, double gain) {Sensor.at(id).gain = gain;}
@@ -74,8 +71,8 @@ public:
     Transform *GetTransform(int id) const {return Sensor.at(id).tr;}
     double GetX(int id) const {return Sensor.at(id).x;}
     double GetY(int id) const {return Sensor.at(id).y;}
-    std::vector <double> GetAllX() const;
-    std::vector <double> GetAllY() const;
+    std::vector <double> GetAllX() const;   // !*! Andr: there was a bug in the implementation
+    std::vector <double> GetAllY() const;   // !*! Andr: there was a bug in the implementation
     double GetGroupX(int gid) const {return Group.at(gid).x;}
     double GetGroupY(int gid) const {return Group.at(gid).y;}
     double GetRadius(int id) const {return Sensor.at(id).GetRadius();}
@@ -83,23 +80,23 @@ public:
     double GetDistance(int ida, int idb) const
         {return LRSensor::Distance(Sensor.at(ida), Sensor.at(idb));}
 
-    std::set <int> &GroupMembers(int gid) {return Group.at(gid).members;}
+    std::set <int> &GroupMembers(int gid) {return Group.at(gid).members;}  // Andr: exposing too much? better to cover functionality with more detailed memeber function
 
-    int GetSensorCount() const {return Sensor.size();}
-    int GetGroupCount() const {return Group.size();}
-    int GetGroupMembersCount(int gid) const {return Group.at(gid).members.size();}
-    bool SensorExists(int id) const {return id>=0 && id<Sensor.size();}
-    bool GroupExists(int gid) const {return gid>=0 && gid<Group.size();}
+    int GetSensorCount() const {return Sensor.size();}      // Andr: suggest to rename to countSensors()
+    int GetGroupCount() const {return Group.size();}        // ->countGroups()
+    int GetGroupMembersCount(int gid) const {return Group.at(gid).members.size();} // ->countGroupMemebers()
+    bool SensorExists(int id) const {return id>=0 && id<Sensor.size();} // -> isSensor or isSensorExists
+    bool GroupExists(int gid) const {return gid>=0 && gid<Group.size();} // similar
 //    int GetLRFCount() const {return Lrf.size();}
 
-    void ClearAll();
+    void ClearAll(); // Andr: What "All" means? -> clear() or more detailed name
     void ResetGroups();
-    void AddSensor(int id, double x, double y);
+    void AddSensor(int id, double x, double y); // Andr: what if there is no default LRF? Accept LRF as an argument?
 
-    int CreateGroup();
+    int CreateGroup(); // Andr: accepting LRF as the argument?
     bool DissolveGroup(int gid);
     bool AddToGroup(int id, int group, Transform *tr);
-    bool RemoveFromGroup(int id, UngroupPolicy policy = KeepLRF);
+    bool RemoveFromGroup(int id, UngroupPolicy policy = KeepLRF);   // Andr: name have to be more specific: remove what?
 
     void MakeGroupsCommon();
     void MakeGroupsByRadius();
@@ -124,11 +121,11 @@ public:
     void SetDefaultLRF(LRF *default_lrf) {DefaultLRF = default_lrf;}
 
 // Evaluation
-    bool InDomain(int id, double *pos_world);
+    bool InDomain(int id, double *pos_world);   // Andr: -> isInDomain(...)
     double Eval(int id, double *pos_world);
     double EvalLocal(int id, double *pos_local) { return GetLRF(id)->eval(pos_local)*GetGain(id); }
-    double EvalDrvX(int id, double *pos_world);
-    double EvalDrvY(int id, double *pos_world);
+    double EvalDrvX(int id, double *pos_world);  // !*! possible bug
+    double EvalDrvY(int id, double *pos_world);  // !*! possible bug
 
 // Fitting
     // direct (not binned)
@@ -137,19 +134,17 @@ public:
     void AddFitData(int id, const std::vector <LRFdata> &data);
     bool FitSensor(int id);
     bool FitGroup(int gid);
-    void ClearAllFitData();
+    void ClearAllFitData();     // !*! Andr: empty function
 
 // Save and Load
-    Json_object SensorGetJsonObject(int id) const;
-    Json_object GroupGetJsonObject(int gid) const;
+    Json_object SensorGetJsonObject(int id) const;  // !*! Andr: not implemented!
+    Json_object GroupGetJsonObject(int gid) const;  // !*! Andr: not implemented!
     void ToJsonObject(Json_object &json) const;
-    Json_object GetJsonObject() const;
+    Json_object GetJsonObject() const;              // !*! Andr: not implemented!
     std::string GetJsonString() const;
 
     void ReadSensor(const Json &json);
     void ReadGroup(const Json &json);
-    LRModel(const Json &json);
-    LRModel(std::string &json_str);
 
 // Utility
     double GetMaxR(int id, const std::vector <LRFdata> &data) const;
@@ -159,7 +154,7 @@ protected:
     std::vector <LRSensor> Sensor;
     std::vector <LRGroup> Group;
 //    std::vector <LRF*> Lrf;
-    LRF *DefaultLRF = 0;
+    LRF *DefaultLRF = nullptr;
     std::string json_err;
     double tol = 1.0e-4;
 };
@@ -167,14 +162,14 @@ protected:
 class GainEstimator
 {
 public:
-    GainEstimator(LRModel *M, int gid);
+    GainEstimator(LRModel *M, int gid); // if M ownership is transferred, add delete in destructor, otherwise give a reference
     ~GainEstimator();
     void AddData(int id, const std::vector <LRFdata> &data);
     double GetRelativeGain(int id, int refid);
     std::vector <double> GetAllRelativeGains(int refid);
 
 protected:
-    LRModel *M;
+    LRModel *M = nullptr;
     int gid;
     std::vector <LRF*> lrfs;
     std::set <int> members;

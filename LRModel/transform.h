@@ -14,7 +14,7 @@ public:
     Transform() {}
     virtual ~Transform() {}
     virtual Transform* clone() const = 0;
-    virtual void DoTransform(double *x, double *y, double *z) const = 0;
+    virtual void DoTransform(double *x, double *y, double *z) const = 0;   // Andr: add function DoTransform(double * position)
     virtual void DoInvTransform(double *x, double *y, double *z) const = 0;
     virtual void ToJsonObject(Json_object &json) const = 0;
 
